@@ -14,7 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      verifications: {
+        Row: {
+          created_at: string
+          explanation: string
+          id: string
+          query_text: string
+          sources: Json
+          verdict: string
+        }
+        Insert: {
+          created_at?: string
+          explanation: string
+          id?: string
+          query_text: string
+          sources: Json
+          verdict: string
+        }
+        Update: {
+          created_at?: string
+          explanation?: string
+          id?: string
+          query_text?: string
+          sources?: Json
+          verdict?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

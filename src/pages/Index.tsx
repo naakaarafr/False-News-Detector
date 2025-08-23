@@ -4,7 +4,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FactCheckInput } from "@/components/FactCheckInput";
 import { VerificationResult, VerificationResultData } from "@/components/VerificationResult";
+import { RecentVerifications } from "@/components/RecentVerifications";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -18,32 +20,27 @@ const Index = () => {
     setVerificationResult(null);
     
     try {
-      // This is a mock implementation - real functionality requires Supabase integration
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
-      
-      // Mock result for demonstration
-      const mockResult: VerificationResultData = {
-        verdict: "Inconclusive",
-        explanation: "To properly verify this news content, we need to integrate with web search APIs and AI analysis services. This requires backend functionality through Supabase integration.",
-        sources: [
-          {
-            url: "https://docs.lovable.dev/integrations/supabase/",
-            snippet: "Connect your Lovable project to Supabase to enable backend functionality including AI API integration, web search capabilities, and data storage.",
-            title: "Supabase Integration Documentation"
-          }
-        ],
-        confidence: "medium"
-      };
-      
-      setVerificationResult(mockResult);
+      const { data, error } = await supabase.functions.invoke('verify-news', {
+        body: { query_text: text }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      const result: VerificationResultData & { cached?: boolean } = data;
+      setVerificationResult(result);
       
       toast({
-        title: "Demo Mode",
-        description: "Connect Supabase to enable real fact-checking functionality",
+        title: result.cached ? "Cached Result" : "Verification Complete",
+        description: result.cached 
+          ? "Returned cached result from recent analysis" 
+          : "New verification completed and cached",
         variant: "default"
       });
       
     } catch (error) {
+      console.error('Verification error:', error);
       toast({
         title: "Error",
         description: "Failed to verify the news content. Please try again.",
@@ -138,18 +135,10 @@ const Index = () => {
             </div>
           )}
 
-          {/* Backend Integration Notice */}
-          <Card className="bg-muted/30 border-dashed">
-            <CardContent className="p-6 text-center">
-              <AlertTriangle className="h-8 w-8 text-amber-500 mx-auto mb-3" />
-              <h3 className="font-semibold mb-2">Backend Integration Required</h3>
-              <p className="text-muted-foreground mb-4">
-                To enable real fact-checking functionality, you need to connect this app to Supabase 
-                for AI API integration, web search capabilities, and data storage.
-              </p>
-              <Badge variant="outline">Click the green Supabase button to get started</Badge>
-            </CardContent>
-          </Card>
+          {/* Recent Verifications */}
+          <div className="mt-8">
+            <RecentVerifications />
+          </div>
         </div>
       </main>
 
