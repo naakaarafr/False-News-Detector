@@ -52,6 +52,16 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+				verified: {
+					true: 'hsl(var(--verified-true))',
+					'true-foreground': 'hsl(var(--verified-true-foreground))',
+					false: 'hsl(var(--verified-false))',
+					'false-foreground': 'hsl(var(--verified-false-foreground))',
+					partial: 'hsl(var(--verified-partial))',
+					'partial-foreground': 'hsl(var(--verified-partial-foreground))',
+					inconclusive: 'hsl(var(--verified-inconclusive))',
+					'inconclusive-foreground': 'hsl(var(--verified-inconclusive-foreground))'
+				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
