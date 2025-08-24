@@ -77,10 +77,10 @@ Deno.serve(async (req) => {
     console.log('Performing web search and AI analysis')
     
     const serperApiKey = Deno.env.get('SERPER_API_KEY')
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY')
     
-    if (!serperApiKey || !openaiApiKey) {
-      throw new Error('Missing required API keys: SERPER_API_KEY and OPENAI_API_KEY')
+    if (!serperApiKey || !geminiApiKey) {
+      throw new Error('Missing required API keys: SERPER_API_KEY and GEMINI_API_KEY')
     }
 
     // Step 1: Search for information about the query
@@ -112,35 +112,32 @@ Deno.serve(async (req) => {
       `Title: ${source.title}\nURL: ${source.url}\nContent: ${source.snippet}`
     ).join('\n\n')
 
-    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a fact-checking expert. Analyze claims and provide verdicts based on available evidence. 
+        contents: [{
+          parts: [{
+            text: `You are a fact-checking expert. Analyze claims and provide verdicts based on available evidence. 
 
 Your verdict must be one of: "True", "False", "Partially True", or "Inconclusive"
 
-Provide a clear explanation of your analysis and reasoning. Be objective and cite the evidence you're using.`
-          },
-          {
-            role: 'user',
-            content: `Please fact-check this claim: "${query_text}"
+Provide a clear explanation of your analysis and reasoning. Be objective and cite the evidence you're using.
+
+Please fact-check this claim: "${query_text}"
 
 Here is the search context I found:
 ${searchContext}
 
 Based on this information, what is your verdict and explanation?`
-          }
-        ],
-        max_tokens: 500,
-        temperature: 0.3
+          }]
+        }],
+        generationConfig: {
+          maxOutputTokens: 500,
+          temperature: 0.3
+        }
       })
     })
 
@@ -149,7 +146,7 @@ Based on this information, what is your verdict and explanation?`
     }
 
     const aiData = await aiResponse.json()
-    const aiAnalysis = aiData.choices[0].message.content
+    const aiAnalysis = aiData.candidates[0].content.parts[0].text
 
     // Extract verdict from AI response (basic parsing)
     let verdict = "Inconclusive"
