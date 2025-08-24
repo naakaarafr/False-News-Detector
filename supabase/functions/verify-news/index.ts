@@ -73,31 +73,99 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Perform new verification (mock implementation for now)
-    console.log('Performing new verification analysis')
+    // Perform web search and AI analysis
+    console.log('Performing web search and AI analysis')
     
-    // TODO: Integrate with Gemini Flash 2.0 and web search APIs
-    // For now, return a more realistic mock response
-    const mockResult: VerificationResult = {
-      verdict: Math.random() > 0.5 ? "Inconclusive" : "Partially True",
-      explanation: `Analysis of "${query_text}" requires integration with web search APIs and AI analysis services. This mock response demonstrates the caching system - subsequent identical queries within 7 days will return this cached result instead of performing new searches.`,
-      sources: [
-        {
-          url: "https://www.snopes.com",
-          snippet: "Fact-checking website for verification of claims and urban legends",
-          title: "Snopes - Fact Checking"
-        },
-        {
-          url: "https://www.factcheck.org",
-          snippet: "Nonpartisan, nonprofit consumer advocate for voters",
-          title: "FactCheck.org"
-        },
-        {
-          url: "https://www.politifact.com",
-          snippet: "Fact-checking journalism from the Poynter Institute",
-          title: "PolitiFact"
-        }
-      ]
+    const serperApiKey = Deno.env.get('SERPER_API_KEY')
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
+    
+    if (!serperApiKey || !openaiApiKey) {
+      throw new Error('Missing required API keys: SERPER_API_KEY and OPENAI_API_KEY')
+    }
+
+    // Step 1: Search for information about the query
+    const searchResponse = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': serperApiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        q: query_text,
+        num: 5
+      })
+    })
+
+    if (!searchResponse.ok) {
+      throw new Error('Failed to perform web search')
+    }
+
+    const searchData = await searchResponse.json()
+    const sources = (searchData.organic || []).slice(0, 3).map((result: any) => ({
+      url: result.link,
+      title: result.title,
+      snippet: result.snippet
+    }))
+
+    // Step 2: Analyze the search results with AI
+    const searchContext = sources.map(source => 
+      `Title: ${source.title}\nURL: ${source.url}\nContent: ${source.snippet}`
+    ).join('\n\n')
+
+    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a fact-checking expert. Analyze claims and provide verdicts based on available evidence. 
+
+Your verdict must be one of: "True", "False", "Partially True", or "Inconclusive"
+
+Provide a clear explanation of your analysis and reasoning. Be objective and cite the evidence you're using.`
+          },
+          {
+            role: 'user',
+            content: `Please fact-check this claim: "${query_text}"
+
+Here is the search context I found:
+${searchContext}
+
+Based on this information, what is your verdict and explanation?`
+          }
+        ],
+        max_tokens: 500,
+        temperature: 0.3
+      })
+    })
+
+    if (!aiResponse.ok) {
+      throw new Error('Failed to get AI analysis')
+    }
+
+    const aiData = await aiResponse.json()
+    const aiAnalysis = aiData.choices[0].message.content
+
+    // Extract verdict from AI response (basic parsing)
+    let verdict = "Inconclusive"
+    const lowerAnalysis = aiAnalysis.toLowerCase()
+    if (lowerAnalysis.includes('verdict: true') || lowerAnalysis.includes('verdict is true')) {
+      verdict = "True"
+    } else if (lowerAnalysis.includes('verdict: false') || lowerAnalysis.includes('verdict is false')) {
+      verdict = "False"
+    } else if (lowerAnalysis.includes('verdict: partially true') || lowerAnalysis.includes('partially true')) {
+      verdict = "Partially True"
+    }
+
+    const result: VerificationResult = {
+      verdict,
+      explanation: aiAnalysis,
+      sources
     }
 
     // Store the new verification result
@@ -105,9 +173,9 @@ Deno.serve(async (req) => {
       .from('verifications')
       .insert({
         query_text: query_text.trim(),
-        verdict: mockResult.verdict,
-        explanation: mockResult.explanation,
-        sources: mockResult.sources
+        verdict: result.verdict,
+        explanation: result.explanation,
+        sources: result.sources
       })
 
     if (insertError) {
@@ -119,7 +187,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        ...mockResult,
+        ...result,
         cached: false
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
