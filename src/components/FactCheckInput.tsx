@@ -58,7 +58,7 @@ export const FactCheckInput = ({ onSubmit, isLoading }: FactCheckInputProps) => 
             size="lg"
             disabled={!inputText.trim() || isLoading}
             className={cn(
-              "w-full bg-[var(--gradient-hero)] hover:opacity-90 transition-opacity",
+              "w-full bg-verified-true hover:bg-verified-true/90 text-verified-true-foreground transition-colors",
               "shadow-[var(--shadow-soft)] text-lg font-medium py-6"
             )}
           >
